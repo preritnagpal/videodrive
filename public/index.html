@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Viewer</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f5f5f5;
+    }
+    #videoContainer {
+      max-width: 800px;
+      margin: 50px auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .video-player {
+      width: 100%;
+      height: 450px;
+      border: none;
+      border-radius: 8px;
+    }
+    .loading {
+      color: #1976d2;
+      padding: 20px;
+    }
+    .error {
+      color: #d32f2f;
+      background: #ffebee;
+      padding: 15px;
+      border-radius: 4px;
+    }
+    #ageGate {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    #ageGateContent {
+      background: #fff;
+      padding: 30px;
+      border-radius: 12px;
+      text-align: center;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      width: 90%;
+      max-width: 400px;
+    }
+    #ageGateContent h2 {
+      margin-bottom: 20px;
+      color: #333;
+    }
+    .btn {
+      padding: 12px 25px;
+      margin: 10px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      transition: background 0.3s ease;
+    }
+    .btn-yes {
+      background-color: #4caf50;
+      color: white;
+    }
+    .btn-yes:hover {
+      background-color: #45a049;
+    }
+    .btn-no {
+      background-color: #d32f2f;
+      color: white;
+    }
+    .btn-no:hover {
+      background-color: #c62828;
+    }
+    @media (max-width: 600px) {
+      .video-player {
+        height: 300px;
+      }
+      #ageGateContent {
+        width: 90%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Age Verification Modal -->
+  <div id="ageGate">
+    <div id="ageGateContent">
+      <h2>Are you 18 or older?</h2>
+      <button id="verifyBtn" class="btn btn-yes">Yes, I'm 18+</button>
+      <button id="denyBtn" class="btn btn-no">No, I'm under 18</button>
+    </div>
+  </div>
+
+  <!-- Video Container -->
+  <h1 style="text-align: center; margin-top: 30px;">🎥 Video Viewer</h1>
+  <div id="videoContainer">
+    <p class="loading">Loading video...</p>
+  </div>
+
+  <!-- ✅ Correctly linking main.js after DOM -->
+  <script src="js/main.js" defer></script>
+</body>
+</html>

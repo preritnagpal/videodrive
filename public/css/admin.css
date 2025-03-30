@@ -1,0 +1,26 @@
+body { background-color: #f8f9fa; }
+.admin-container { max-width: 800px; margin: 30px auto; }
+.upload-box { 
+  background: white; 
+  border-radius: 10px; 
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  padding: 25px;
+  margin-bottom: 30px;
+}
+.status-card {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.connected { border-left: 5px solid #28a745; }
+.disconnected { border-left: 5px solid #dc3545; }
+.video-link { 
+  background: #f1f1f1;
+  border-radius: 5px;
+  padding: 10px;
+  margin-top: 15px;
+  word-break: break-all;
+}
+.btn-connect { width: 100%; }
