@@ -132,7 +132,7 @@ function broadcastVideosUpdate() {
       number,
       id: data.driveId,
       name: data.name,
-      link: `${process.env.BASE_URL || 'http://localhost:3000'}/?video=${number}`
+      link: `${process.env.BASE_URL || 'https://videodrive.onrender.com'}/?video=${number}`
     }));
 
     wss.clients.forEach(client => {
@@ -278,7 +278,7 @@ app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
 
     res.json({
       success: true,
-      link: `${process.env.BASE_URL || 'http://localhost:3000'}/?video=${nextNumber}`,
+      link: `${process.env.BASE_URL || 'https://videodrive.onrender.com'}/?video=${nextNumber}`,
       id: fileId,
       number: nextNumber,
       name: req.file.originalname
@@ -314,7 +314,7 @@ app.get('/admin/videos', requireAuth, (req, res) => {
       number,
       id: data.driveId,
       name: data.name,
-      link: `${process.env.BASE_URL || 'http://localhost:3000'}/?video=${number}`,
+      link: `${process.env.BASE_URL || 'https://videodrive.onrender.com'}/?video=${number}`,
       driveLink: `https://drive.google.com/file/d/${data.driveId}/view`
     }));
 
