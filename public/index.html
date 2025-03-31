@@ -115,14 +115,6 @@
       align-items: center;
       background: transparent;
     }
-    .ts-ad-container2 {
-      margin: 0px auto;
-      min-width: 900px;
-      min-height: 250px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: transparent;
     @media (max-width: 600px) {
       .video-player {
         height: 300px;
@@ -159,11 +151,15 @@
   </div>
 
   <!-- Video Container -->
-  <div class="ts-ad-container2">
-       <script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>
-        <ins id="1086251" data-width="908" data-height="258"></ins>
-        <script type="text/javascript" data-cfasync="false" async>(adsbyjuicy = window.adsbyjuicy || []).push({'adzone':1086251});</script>
-  </div>
+ <div class="full-width-top-ad" style="width:100%; height:100px; position:fixed; top:0; left:0; z-index:9997; background:#f0f0f0;">
+  <script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>
+  <ins id="1086251" data-width="100%" data-height="100"></ins>
+  <script type="text/javascript" data-cfasync="false" async>(adsbyjuicy = window.adsbyjuicy || []).push({
+    'adzone':1086251,
+    'width':'100%',
+    'height':100
+  });</script>
+</div>
   <h1 style="text-align: center; margin: 190px auto;">🎥 Video Viewer</h1>
   <div id="videoContainer">
     <p class="loading">Loading video...</p>
