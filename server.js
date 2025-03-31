@@ -131,7 +131,7 @@ function broadcastVideosUpdate() {
       number,
       id: data.driveId,
       name: data.name,
-      link: `${process.env.BASE_URL || 'http://localhost:3000'}/?video=${number}`
+      link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${number}`
     }));
 
     wss.clients.forEach(client => {
@@ -285,7 +285,7 @@ app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
 
     res.json({
       success: true,
-      link: `${process.env.BASE_URL || 'http://localhost:3000'}/?video=${randomNumber}`,
+      link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${randomNumber}`,
       id: fileId,
       number: randomNumber,
       name: req.file.originalname
@@ -321,7 +321,7 @@ app.get('/admin/videos', requireAuth, (req, res) => {
       number,
       id: data.driveId,
       name: data.name,
-      link: `${process.env.BASE_URL || 'http://localhost:3000'}/?video=${number}`,
+      link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${number}`,
       driveLink: `https://drive.google.com/file/d/${data.driveId}/view`
     }));
 
