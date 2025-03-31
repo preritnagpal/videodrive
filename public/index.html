@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="6a97888e-site-verification" content="92f1c2302972e1d871a3f8ccf83e3325">
   <title>Video Viewer</title>
   <style>
     body {
@@ -107,6 +106,14 @@
     .btn-no:hover {
       background-color: #c62828;
     }
+    .ts-ad-container {
+      margin: 20px auto;
+      min-height: 250px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: transparent;
+    }
     @media (max-width: 600px) {
       .video-player {
         height: 300px;
@@ -122,9 +129,16 @@
     <div id="adGateContent">
       <h2>Click on add then press back to continue</h2>
       <p>विज्ञापन पर क्लिक करें फिर जारी रखने के लिए वापस दबाएं</p>
-      <a id="adLink" href="https://example.com/ad-page" target="_self">
-        <img src="https://via.placeholder.com/300x250?text=Ad+Placeholder" alt="Ad" style="cursor: pointer; border: none;">
-      </a>
+      <div class="ts-ad-container">
+        <script type="text/javascript" 
+                src="//cdn.tsyndicate.com/sdk/v1/bijs" 
+                data-ts-spot="5318e671f4014953997dd36732aed5c3" 
+                data-ts-width="300" 
+                data-ts-height="250" 
+                data-ts-extid="textid" 
+                async defer>
+        </script>
+      </div>
       <button id="adClickBtn" class="btn btn-yes" style="display: none;">I have clicked the ad</button>
     </div>
   </div>
