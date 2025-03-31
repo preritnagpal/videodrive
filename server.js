@@ -10,6 +10,16 @@ const WebSocket = require('ws');
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
+// server.js - Force immediate health check response
+app.get('/healthz', (req, res) => {
+  res.status(200).send('OK');
+});
+
+// Make all other routes respond quickly
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-cache');
+  next();
+});
 
 // Verify required environment variables
 const requiredEnvVars = [
