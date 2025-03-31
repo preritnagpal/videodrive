@@ -123,18 +123,12 @@
         width: 90%;
       }
     }
-    @media (max-width: 768px) {
-    .top-banner-ad-container {
-      height: 80px; /* Slightly shorter on mobile */
-    }
+  @media (max-width: 768px) {
+  .full-width-top-ad, .full-width-top-adtwo {
+    height: 80px; /* Slightly shorter on mobile */
   }
-  
-  @media (max-width: 480px) {
-    .top-banner-ad-container {
-      height: 70px; /* Even shorter on small phones */
-      position: sticky; /* Better mobile behavior */
-    }
-  }
+}
+
   </style>
 </head>
 <body>
@@ -163,23 +157,33 @@
   </div>
 
   <!-- Video Container -->
- <div class="full-width-top-ad" style="width:100%; height:100px; position:fixed; top:0; left:0; z-index:9997; background:#f0f0f0;">
-  <script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>
-  <ins id="1086251" data-width="100%" data-height="100"></ins>
-  <script type="text/javascript" data-cfasync="false" async>(adsbyjuicy = window.adsbyjuicy || []).push({
-    'adzone':1086251,
-    'width':'100%',
-    'height':100
-  });</script>
-</div>
-   <div class="full-width-top-adtwo" style="width:100%; height:100px; position:fixed; top:100; left:0; z-index:9997; background:#f0f0f0;">
-  <script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>
-  <ins id="1086253" data-width="100%" data-height="100"></ins>
-  <script type="text/javascript" data-cfasync="false" async>(adsbyjuicy = window.adsbyjuicy || []).push({
-    'adzone':1086253,
-    'width':'100%',
-    'height':100
-  });</script>
+ <!-- Combined Ad Container -->
+<div style="position:fixed; top:0; left:0; width:100%; z-index:9997;">
+  <!-- First Ad (Top) -->
+  <div style="width:100%; height:100px; background:#f0f0f0;">
+    <script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>
+    <ins id="1086251" data-width="100%" data-height="100" style="display:block;"></ins>
+    <script type="text/javascript" data-cfasync="false" async>
+      (adsbyjuicy = window.adsbyjuicy || []).push({
+        'adzone':1086251,
+        'width':'100%',
+        'height':100
+      });
+    </script>
+  </div>
+  
+  <!-- Second Ad (Immediately Below) -->
+  <div style="width:100%; height:100px; background:#f0f0f0;">
+    <script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>
+    <ins id="1086253" data-width="100%" data-height="100" style="display:block;"></ins>
+    <script type="text/javascript" data-cfasync="false" async>
+      (adsbyjuicy = window.adsbyjuicy || []).push({
+        'adzone':1086253,
+        'width':'100%',
+        'height':100
+      });
+    </script>
+  </div>
 </div>
 
   <h1 style="text-align: center; margin: 190px auto;">🎥 Video Viewer</h1>
