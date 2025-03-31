@@ -123,6 +123,18 @@
         width: 90%;
       }
     }
+    @media (max-width: 768px) {
+    .top-banner-ad-container {
+      height: 80px; /* Slightly shorter on mobile */
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .top-banner-ad-container {
+      height: 70px; /* Even shorter on small phones */
+      position: sticky; /* Better mobile behavior */
+    }
+  }
   </style>
 </head>
 <body>
