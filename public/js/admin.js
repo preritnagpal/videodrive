@@ -30,6 +30,9 @@ function initWebSocket() {
           if (data.type === 'session_update') {
               handleSessionUpdate(data);
           }
+          if (data.type === 'upload_progress') {
+              updateUploadProgress(data.progress);
+          }
       } catch (error) {
           console.error('WebSocket message error:', error);
       }
@@ -107,30 +110,54 @@ async function handleDriveOperation(operation) {
   }
 }
 
-// Upload Handler
-document.getElementById("uploadForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const form = e.target;
-  const submitBtn = form.querySelector('button[type="submit"]');
+// Upload Handler with Progress Tracking
+document.getElementById('upload-btn').addEventListener('click', async () => {
+  const fileInput = document.getElementById('video-upload');
+  const file = fileInput.files[0];
   
-  try {
-      setButtonState(submitBtn, true, "Uploading...");
-      
-      await handleDriveOperation(async () => {
-          const formData = new FormData(form);
-          const response = await fetch("/upload", {
-              method: "POST",
-              body: formData
-          });
+  if (!file) {
+    alert('Please select a video file');
+    return;
+  }
 
-          const result = await handleResponse(response);
-          showUploadResult(result.link);
+  // Show progress UI
+  document.getElementById('progress-container').style.display = 'block';
+  const progressBar = document.getElementById('upload-progress');
+  const progressText = document.getElementById('progress-text');
+
+  try {
+    await handleDriveOperation(async () => {
+      const formData = new FormData();
+      formData.append('video', file);
+
+      const response = await fetch('/upload', {
+        method: 'POST',
+        body: formData
       });
+
+      // Track progress via WebSocket
+      socket.send(JSON.stringify({
+        type: 'upload_start',
+        filename: file.name,
+        size: file.size
+      }));
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const result = await response.json();
+      showUploadResult(result.link);
+      return result;
+    });
   } catch (error) {
-      showError(`Upload failed: ${error.message}`);
+    console.error('Upload failed:', error);
+    showError(`Upload failed: ${error.message}`);
   } finally {
-      setButtonState(submitBtn, false, '<i class="fas fa-cloud-upload-alt me-1"></i> Upload Video');
-      form.reset();
+    fileInput.value = ''; // Reset file input
+    progressBar.value = 0;
+    progressText.textContent = '0%';
+    document.getElementById('progress-container').style.display = 'none';
   }
 });
 
@@ -158,6 +185,13 @@ async function deleteVideo(videoId, videoNumber) {
 }
 
 // Helper Functions
+function updateUploadProgress(percent) {
+  const progressBar = document.getElementById('upload-progress');
+  const progressText = document.getElementById('progress-text');
+  progressBar.value = percent;
+  progressText.textContent = `${percent}%`;
+}
+
 async function handleResponse(response) {
   if (!response.ok) {
       const error = await response.json().catch(() => ({}));
@@ -180,6 +214,16 @@ function setButtonState(btn, isLoading, text) {
       btn.innerHTML = text;
       btn.disabled = false;
   }
+}
+
+function showUploadResult(link) {
+  // Implement your success notification UI here
+  alert(`Upload successful! Video available at: ${link}`);
+}
+
+function showError(message) {
+  // Implement your error notification UI here
+  alert(message);
 }
 
 // Initialize
