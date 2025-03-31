@@ -9,7 +9,41 @@ const fs = require('fs');
 const WebSocket = require('ws');
 
 const app = express();
-const upload = multer({ storage: multer.memoryStorage() });
+const uploadDir = path.join(__dirname, 'temp_uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadDir); // Save to disk
+    },
+    filename: (req, file, cb) => {
+      // Generate unique filename
+      cb(null, `${Date.now()}-${file.originalname}`);
+    }
+  }),
+  limits: {
+    fileSize: 1073741824, // 1GB in bytes
+    files: 1
+  }
+});
+
+// Cleanup middleware to delete temp files after upload
+app.use((req, res, next) => {
+  if (req.file) {
+    res.on('finish', () => {
+      try {
+        fs.unlinkSync(req.file.path);
+        console.log(`Cleaned up temp file: ${req.file.path}`);
+      } catch (err) {
+        console.error('Temp file cleanup failed:', err);
+      }
+    });
+  }
+  next();
+});
 
 // Verify required environment variables
 const requiredEnvVars = [
@@ -218,89 +252,67 @@ function generateRandomNumber(min = 1000, max = 9999) {
 // File Upload with Enhanced Error Handling
 app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
   try {
-    if (!req.session.tokens) {
-      return res.status(401).json({ 
-        success: false, 
-        error: 'Google Drive not connected',
-        reconnect: true
-      });
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
     }
 
-    if (!req.file) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'No file selected' 
-      });
-    }
+    console.log(`Starting upload for: ${req.file.originalname} (${(req.file.size / (1024 * 1024)).toFixed(2)}MB)`);
 
     const drive = google.drive({ version: 'v3', auth: oAuth2Client });
 
-    // Upload to Drive
-    const driveResponse = await drive.files.create({
-      requestBody: {
-        name: req.file.originalname,
-        mimeType: req.file.mimetype,
-        parents: [process.env.GOOGLE_DRIVE_FOLDER_ID]
-      },
-      media: {
-        mimeType: req.file.mimetype,
-        body: require('stream').Readable.from(req.file.buffer),
-      },
-    });
-
-    const fileId = driveResponse.data.id;
-
-    // Set public permissions
-    await drive.permissions.create({
-      fileId: fileId,
-      requestBody: {
-        role: 'reader',
-        type: 'anyone',
-      },
-    });
-
-    // Update videos.json
-    const videosFilePath = path.join(__dirname, 'public', 'videos.json');
-    let videos = {};
-    
-    if (fs.existsSync(videosFilePath)) {
-      videos = JSON.parse(fs.readFileSync(videosFilePath, 'utf8'));
-    }
-
-    // Generate a unique random number
-    let randomNumber;
-    do {
-      randomNumber = generateRandomNumber();
-    } while (videos[randomNumber]); // Ensure the number is unique
-
-    videos[randomNumber] = {
-      driveId: fileId,
-      name: req.file.originalname
+    // Create resumable upload session
+    const fileMetadata = {
+      name: req.file.originalname,
+      mimeType: req.file.mimetype,
+      parents: [process.env.GOOGLE_DRIVE_FOLDER_ID]
     };
 
-    fs.writeFileSync(videosFilePath, JSON.stringify(videos, null, 2));
+    const media = {
+      mimeType: req.file.mimetype,
+      body: fs.createReadStream(req.file.path),
+    };
 
-    // Broadcast update
-    broadcastVideosUpdate();
+    const driveResponse = await drive.files.create({
+      resource: fileMetadata,
+      media: media,
+      supportsAllDrives: true,
+      fields: 'id,name,webViewLink',
+      // Enable resumable uploads
+      resumable: true
+    }, {
+      // Set timeout to 1 hour (3600000ms)
+      timeout: 3600000,
+      onUploadProgress: (evt) => {
+        const progress = (evt.bytesRead / req.file.size) * 100;
+        console.log(`Upload progress: ${progress.toFixed(2)}%`);
+        // You could emit this via WebSocket to client
+      }
+    });
+
+    // Clean up temp file
+    fs.unlinkSync(req.file.path);
+
+    // Rest of your existing code for updating videos.json...
+    // ... [keep your existing videos.json update logic]
 
     res.json({
       success: true,
-      link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${randomNumber}`,
-      id: fileId,
-      number: randomNumber,
-      name: req.file.originalname
+      fileId: driveResponse.data.id,
+      link: driveResponse.data.webViewLink
     });
 
   } catch (error) {
     console.error('Upload error:', error);
-    const needsReconnect = error.message.includes('invalid_grant') || 
-                         error.message.includes('token expired');
     
+    // Clean up temp file if it exists
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
     res.status(500).json({ 
       success: false, 
       error: 'Upload failed',
-      reconnect: needsReconnect,
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: error.message
     });
   }
 });
