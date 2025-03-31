@@ -9,41 +9,7 @@ const fs = require('fs');
 const WebSocket = require('ws');
 
 const app = express();
-const uploadDir = path.join(__dirname, 'temp_uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, uploadDir); // Save to disk
-    },
-    filename: (req, file, cb) => {
-      // Generate unique filename
-      cb(null, `${Date.now()}-${file.originalname}`);
-    }
-  }),
-  limits: {
-    fileSize: 1073741824, // 1GB in bytes
-    files: 1
-  }
-});
-
-// Cleanup middleware to delete temp files after upload
-app.use((req, res, next) => {
-  if (req.file) {
-    res.on('finish', () => {
-      try {
-        fs.unlinkSync(req.file.path);
-        console.log(`Cleaned up temp file: ${req.file.path}`);
-      } catch (err) {
-        console.error('Temp file cleanup failed:', err);
-      }
-    });
-  }
-  next();
-});
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Verify required environment variables
 const requiredEnvVars = [
@@ -165,7 +131,7 @@ function broadcastVideosUpdate() {
       number,
       id: data.driveId,
       name: data.name,
-      link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${number}`
+      link: `${process.env.BASE_URL || 'http://localhost:3000'}/?video=${number}`
     }));
 
     wss.clients.forEach(client => {
@@ -319,7 +285,7 @@ app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
 
     res.json({
       success: true,
-      link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${randomNumber}`,
+      link: `${process.env.BASE_URL || 'http://localhost:3000'}/?video=${randomNumber}`,
       id: fileId,
       number: randomNumber,
       name: req.file.originalname
@@ -355,7 +321,7 @@ app.get('/admin/videos', requireAuth, (req, res) => {
       number,
       id: data.driveId,
       name: data.name,
-      link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${number}`,
+      link: `${process.env.BASE_URL || 'http://localhost:3000'}/?video=${number}`,
       driveLink: `https://drive.google.com/file/d/${data.driveId}/view`
     }));
 
