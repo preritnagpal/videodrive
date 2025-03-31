@@ -10,8 +10,6 @@ const WebSocket = require('ws');
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
-// server.js - Force immediate health check response
-
 
 // Verify required environment variables
 const requiredEnvVars = [
@@ -52,7 +50,6 @@ app.get('/get-video/:number', (req, res) => {
   // If video not found
   res.status(404).json({ success: false, error: 'Video not found' });
 });
-
 
 // Middleware Setup
 app.use(express.json());
@@ -134,7 +131,7 @@ function broadcastVideosUpdate() {
       number,
       id: data.driveId,
       name: data.name,
-      link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${number}`
+      link: `${process.env.BASE_URL || 'http://localhost:3000'}/?video=${number}`
     }));
 
     wss.clients.forEach(client => {
@@ -213,6 +210,12 @@ app.get('/auth/status', requireAuth, (req, res) => {
 });
 
 // File Upload with Enhanced Error Handling
+// Helper function to generate random number
+function generateRandomNumber(min = 1000, max = 9999) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// File Upload with Enhanced Error Handling
 app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
   try {
     if (!req.session.tokens) {
@@ -264,11 +267,13 @@ app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
       videos = JSON.parse(fs.readFileSync(videosFilePath, 'utf8'));
     }
 
-    const nextNumber = Object.keys(videos).length > 0 
-      ? Math.max(...Object.keys(videos).map(Number)) + 1 
-      : 1;
+    // Generate a unique random number
+    let randomNumber;
+    do {
+      randomNumber = generateRandomNumber();
+    } while (videos[randomNumber]); // Ensure the number is unique
 
-    videos[nextNumber] = {
+    videos[randomNumber] = {
       driveId: fileId,
       name: req.file.originalname
     };
@@ -280,9 +285,9 @@ app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
 
     res.json({
       success: true,
-      link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${nextNumber}`,
+      link: `${process.env.BASE_URL || 'http://localhost:3000'}/?video=${randomNumber}`,
       id: fileId,
-      number: nextNumber,
+      number: randomNumber,
       name: req.file.originalname
     });
 
@@ -316,7 +321,7 @@ app.get('/admin/videos', requireAuth, (req, res) => {
       number,
       id: data.driveId,
       name: data.name,
-      link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${number}`,
+      link: `${process.env.BASE_URL || 'http://localhost:3000'}/?video=${number}`,
       driveLink: `https://drive.google.com/file/d/${data.driveId}/view`
     }));
 
