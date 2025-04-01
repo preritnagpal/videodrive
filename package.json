@@ -5,8 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js",
-    "build": "npm install --omit=dev"  // Optimized for Koyeb builds
+    "dev": "nodemon server.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
@@ -16,16 +15,11 @@
     "express-session": "^1.18.1",
     "google-auth-library": "^9.15.1",
     "googleapis": "^120.0.0",
-    "mongodb": "^5.9.0",              // MongoDB driver
-    "mongoose": "^8.3.1",             // Optional but recommended
+    "mongodb": "^5.9.0",
     "multer": "^1.4.5-lts.1",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "nodemon": "^2.0.20"
-  },
-  "engines": {
-    "node": ">=18.0.0",               // Required for MongoDB driver
-    "npm": ">=9.0.0"
   }
 }
