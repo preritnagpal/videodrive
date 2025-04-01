@@ -13,11 +13,10 @@ const app = express();
 
 // Improved Multer Configuration for Large Files
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: '/tmp/uploads', // Koyeb-friendly temp dir
-    filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
-  }),
-  limits: { fileSize: 1024 * 1024 * 1024 } // 500MB max
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 1024 * 1024 * 1024 // 1GB limit
+  }
 });
 
 // MongoDB Configuration with SSL fix
@@ -329,17 +328,28 @@ function generateRandomNumber(min = 1000, max = 9999) {
 
 app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+    if (!req.session.tokens) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Google Drive not connected',
+        reconnect: true
+      });
     }
 
-    const drive = google.drive({
-      version: 'v3',
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No file selected' 
+      });
+    }
+
+    const drive = google.drive({ 
+      version: 'v3', 
       auth: oAuth2Client,
-      timeout: 1200000 // 20 minutes timeout
+      timeout: 700000 // 5 minute timeout
     });
 
-    // Resumable upload with chunked streaming
+    // Create resumable upload session
     const driveResponse = await drive.files.create({
       requestBody: {
         name: req.file.originalname,
@@ -348,34 +358,14 @@ app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
       },
       media: {
         mimeType: req.file.mimetype,
-        body: fs.createReadStream(req.file.path), // Stream from disk
+        body: require('stream').Readable.from(req.file.buffer),
       },
-      resumable: true
+      resumable: true // Enable resumable uploads
     }, {
-      timeout: 1200000, // 20 minutes
-      maxRetries: 5,
-      retryOptions: {
-        retryableErrorCodes: ['ETIMEDOUT', 'ECONNRESET', 'ESOCKETTIMEDOUT'],
-        noResponseRetries: 3
-      }
+      // Custom timeout and retry configuration
+      timeout: 700000,
+      maxRetries: 3
     });
-
-    // Cleanup temp file
-    fs.unlink(req.file.path, () => {});
-
-    // ... (rest of your DB handling code)
-
-  } catch (error) {
-    // Cleanup on error
-    if (req.file?.path) fs.unlink(req.file.path, () => {});
-    
-    console.error('Upload error:', error);
-    res.status(500).json({ 
-      error: 'Upload failed',
-      details: error.message
-    });
-  }
-});
 
     const fileId = driveResponse.data.id;
 
