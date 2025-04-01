@@ -50,7 +50,6 @@ async function initMongoDB() {
     setTimeout(initMongoDB, 5000);
   }
 }
-}
 app.get('/test-db', async (req, res) => {
   try {
     if (!dbClient) await initMongoDB();
