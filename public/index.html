@@ -118,7 +118,11 @@
       width: 100%;
       height: 100px;
       background: #f0f0f0;
-      margin-bottom: 0;
+      margin-bottom: 5px; /* Added small margin between ads */
+      overflow: hidden; /* Prevent content overflow */
+    }
+    .ad-container {
+      margin-bottom: 10px; /* Space between ad groups */
     }
     @media (max-width: 600px) {
       .video-player {
@@ -127,10 +131,14 @@
       #ageGateContent {
         width: 90%;
       }
+      .ad-banner {
+        height: 90px; /* Slightly reduced height for mobile */
+        margin-bottom: 3px; /* Smaller margin on mobile */
+      }
     }
     @media (max-width: 768px) {
       .ad-banner {
-        height: 80px;
+        height: 90px;
       }
     }
   </style>
@@ -160,19 +168,21 @@
   </div>
 
   <!-- Top Ads (2 Banners) -->
-  <div class="ad-banner">
-    <script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>
-    <ins id="1086251" data-width="100%" data-height="100" style="display:block;"></ins>
-    <script type="text/javascript" data-cfasync="false" async>
-      (adsbyjuicy = window.adsbyjuicy || []).push({'adzone':1086251,'width':'100%','height':100});
-    </script>
-  </div>
-  <div class="ad-banner">
-    <script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>
-    <ins id="1086253" data-width="100%" data-height="100" style="display:block;"></ins>
-    <script type="text/javascript" data-cfasync="false" async>
-      (adsbyjuicy = window.adsbyjuicy || []).push({'adzone':1086253,'width':'100%','height':100});
-    </script>
+  <div class="ad-container">
+    <div class="ad-banner">
+      <script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>
+      <ins id="1086251" data-width="100%" data-height="100" style="display:block;"></ins>
+      <script type="text/javascript" data-cfasync="false" async>
+        (adsbyjuicy = window.adsbyjuicy || []).push({'adzone':1086251,'width':'100%','height':100});
+      </script>
+    </div>
+    <div class="ad-banner">
+      <script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>
+      <ins id="1086253" data-width="100%" data-height="100" style="display:block;"></ins>
+      <script type="text/javascript" data-cfasync="false" async>
+        (adsbyjuicy = window.adsbyjuicy || []).push({'adzone':1086253,'width':'100%','height':100});
+      </script>
+    </div>
   </div>
 
   <!-- Video Container -->
@@ -181,19 +191,21 @@
   </div>
 
   <!-- Bottom Ads (2 Banners) -->
-  <div class="ad-banner">
-    <script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>
-    <ins id="1086251" data-width="100%" data-height="100" style="display:block;"></ins>
-    <script type="text/javascript" data-cfasync="false" async>
-      (adsbyjuicy = window.adsbyjuicy || []).push({'adzone':1086251,'width':'100%','height':100});
-    </script>
-  </div>
-  <div class="ad-banner">
-    <script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>
-    <ins id="1086253" data-width="100%" data-height="100" style="display:block;"></ins>
-    <script type="text/javascript" data-cfasync="false" async>
-      (adsbyjuicy = window.adsbyjuicy || []).push({'adzone':1086253,'width':'100%','height':100});
-    </script>
+  <div class="ad-container">
+    <div class="ad-banner">
+      <script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>
+      <ins id="1086251" data-width="100%" data-height="100" style="display:block;"></ins>
+      <script type="text/javascript" data-cfasync="false" async>
+        (adsbyjuicy = window.adsbyjuicy || []).push({'adzone':1086254,'width':'100%','height':100});
+      </script>
+    </div>
+    <div class="ad-banner">
+      <script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>
+      <ins id="1086253" data-width="100%" data-height="100" style="display:block;"></ins>
+      <script type="text/javascript" data-cfasync="false" async>
+        (adsbyjuicy = window.adsbyjuicy || []).push({'adzone':1086255,'width':'100%','height':100});
+      </script>
+    </div>
   </div>
 
   <!-- Script (Loaded Deferred) -->
