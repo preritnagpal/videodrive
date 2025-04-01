@@ -1,25 +1,25 @@
 {
-  "name": "video-sharing-platform",
-  "version": "1.0.0",
-  "description": "Secure video sharing platform with age verification",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
-  },
-  "dependencies": {
-    "bcryptjs": "^3.0.2",
-    "crypto": "^1.0.1",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
-    "express-session": "^1.18.1",
-    "google-auth-library": "^9.15.1",
-    "googleapis": "^120.0.0",
-    "mongodb": "^5.9.0",
-    "multer": "^1.4.5-lts.1",
-    "socket.io": "^4.8.1"
-  },
-  "devDependencies": {
-    "nodemon": "^2.0.20"
-  }
+    "name": "video-sharing-platform",
+    "version": "1.0.0",
+    "description": "Secure video sharing platform with age verification",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "dev": "nodemon server.js"
+    },
+    "dependencies": {
+        "bcryptjs": "^3.0.2",
+        "crypto": "^1.0.1",
+        "dotenv": "^16.4.7",
+        "express": "^4.21.2",
+        "express-session": "^1.18.1",
+        "google-auth-library": "^9.15.1",
+        "googleapis": "^120.0.0",
+        "mongodb": "^5.9.0",
+        "multer": "^1.4.5-lts.1",
+        "socket.io": "^4.8.1"
+    },
+    "devDependencies": {
+        "nodemon": "^2.0.20"
+    }
 }
