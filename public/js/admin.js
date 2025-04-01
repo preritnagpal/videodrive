@@ -1,54 +1,93 @@
-// admin.js - Dual Storage Version
+// admin.js - Enhanced Dual Storage Version
 const { MongoClient } = require('mongodb');
 const fs = require('fs');
 const path = require('path');
+const { google } = require('googleapis');
 
 // Configuration
 const DB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 const DB_NAME = 'videoDB';
 const JSON_PATH = path.join(__dirname, 'storage', 'videos.json');
 
-// Initialize storage
-!fs.existsSync(path.dirname(JSON_PATH)) && fs.mkdirSync(path.dirname(JSON_PATH), { recursive: true });
-!fs.existsSync(JSON_PATH) && fs.writeFileSync(JSON_PATH, '{}');
+// Initialize storage directory
+if (!fs.existsSync(path.dirname(JSON_PATH))) {
+  fs.mkdirSync(path.dirname(JSON_PATH), { recursive: true });
+}
+if (!fs.existsSync(JSON_PATH)) {
+  fs.writeFileSync(JSON_PATH, '{}');
+}
 
-// Connection handling
+// Enhanced DB Connection with reconnect
 let db;
-(async function connectDB() {
+let mongoClient;
+
+async function connectDB() {
   try {
-    if (!DB_URI.includes('localhost')) { // Only connect if not local
-      const client = new MongoClient(DB_URI);
-      await client.connect();
-      db = client.db(DB_NAME);
+    if (!DB_URI.includes('localhost')) {
+      mongoClient = new MongoClient(DB_URI, {
+        connectTimeoutMS: 10000,
+        socketTimeoutMS: 30000,
+        serverSelectionTimeoutMS: 10000,
+        retryWrites: true,
+        retryReads: true
+      });
+      
+      await mongoClient.connect();
+      db = mongoClient.db(DB_NAME);
+      await db.command({ ping: 1 });
       console.log('✅ MongoDB Connected');
+      
+      // Create indexes if they don't exist
+      await db.collection('videos').createIndex({ number: 1 }, { unique: true });
+      await db.collection('videos').createIndex({ driveId: 1 });
     }
   } catch (err) {
     console.error('❌ MongoDB Connection Error:', err);
+    // Auto-reconnect after 5 seconds
+    setTimeout(connectDB, 5000);
   }
-})();
+}
 
-// Dual Storage Operations
+// Initialize connection
+connectDB();
+
+// Enhanced Video Store with additional metadata
 const videoStore = {
-  // Get all videos (combines both sources)
   async getAll() {
     const videos = {};
     
-    // From MongoDB
+    // Try MongoDB first
     if (db) {
       try {
-        (await db.collection('videos').find().toArray()).forEach(v => {
-          videos[v.number] = { driveId: v.driveId, name: v.name };
+        const mongoVideos = await db.collection('videos')
+          .find()
+          .sort({ createdAt: -1 }) // Newest first
+          .toArray();
+          
+        mongoVideos.forEach(v => {
+          videos[v.number] = { 
+            driveId: v.driveId, 
+            name: v.name,
+            createdAt: v.createdAt,
+            size: v.size,
+            views: v.views || 0
+          };
         });
       } catch (err) {
         console.error('MongoDB Read Error:', err);
       }
     }
     
-    // From JSON (won't overwrite MongoDB entries)
+    // Fallback to JSON
     try {
       const jsonVideos = JSON.parse(fs.readFileSync(JSON_PATH, 'utf8'));
       Object.entries(jsonVideos).forEach(([number, data]) => {
-        if (!videos[number]) videos[number] = data;
+        if (!videos[number]) {
+          videos[number] = {
+            ...data,
+            createdAt: data.createdAt || new Date().toISOString()
+          };
+        }
       });
     } catch (err) {
       console.error('JSON Read Error:', err);
@@ -57,16 +96,27 @@ const videoStore = {
     return videos;
   },
 
-  // Add video to both stores
   async add(videoData) {
-    const { number, driveId, name } = videoData;
+    const { number, driveId, name, size = 0 } = videoData;
+    const now = new Date();
     
     // MongoDB
     if (db) {
       try {
         await db.collection('videos').updateOne(
           { number },
-          { $set: { driveId, name, updatedAt: new Date() } },
+          { 
+            $set: { 
+              driveId, 
+              name, 
+              size,
+              updatedAt: now 
+            },
+            $setOnInsert: {
+              createdAt: now,
+              views: 0
+            }
+          },
           { upsert: true }
         );
       } catch (err) {
@@ -77,14 +127,18 @@ const videoStore = {
     // JSON
     try {
       const videos = JSON.parse(fs.readFileSync(JSON_PATH, 'utf8'));
-      videos[number] = { driveId, name };
+      videos[number] = { 
+        driveId, 
+        name,
+        size,
+        createdAt: now.toISOString()
+      };
       fs.writeFileSync(JSON_PATH, JSON.stringify(videos, null, 2));
     } catch (err) {
       console.error('JSON Write Error:', err);
     }
   },
 
-  // Delete from both stores
   async delete(videoId) {
     // MongoDB
     if (db) {
@@ -106,7 +160,6 @@ const videoStore = {
       if (videos[videoId]) {
         delete videos[videoId];
       } else {
-        // Search by driveId if number not found
         for (const [number, data] of Object.entries(videos)) {
           if (data.driveId === videoId) {
             delete videos[number];
@@ -118,14 +171,39 @@ const videoStore = {
     } catch (err) {
       console.error('JSON Delete Error:', err);
     }
+  },
+
+  // New: Increment view count
+  async incrementViews(videoId) {
+    if (db) {
+      try {
+        await db.collection('videos').updateOne(
+          { $or: [{ number: videoId }, { driveId: videoId }] },
+          { $inc: { views: 1 } }
+        );
+      } catch (err) {
+        console.error('MongoDB View Increment Error:', err);
+      }
+    }
   }
 };
 
-// Keep your existing WebSocket and auth state logic
+// Google Drive Status Check
+async function checkDriveStatus(authClient) {
+  try {
+    const drive = google.drive({ version: 'v3', auth: authClient });
+    await drive.about.get({ fields: 'user' });
+    return { connected: true };
+  } catch (err) {
+    return { connected: false, error: err.message };
+  }
+}
+
 module.exports = {
   ...videoStore,
-  // Export existing functions you need
   checkDriveStatus,
-  handleDriveOperation,
-  initWebSocket
+  connectDB, // Export for health checks
+  closeDB: async () => {
+    if (mongoClient) await mongoClient.close();
+  }
 };
