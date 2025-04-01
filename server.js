@@ -28,8 +28,7 @@ async function initMongoDB() {
         retryReads: true,
         serverApi: ServerApiVersion.v1,
         tls: true,
-        tlsAllowInvalidCertificates: false,
-        minTLSVersion: 'TLSv1.2'
+        tlsAllowInvalidCertificates: false
       });
       
       await client.connect();
