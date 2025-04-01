@@ -10,7 +10,14 @@ const WebSocket = require('ws');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 
 const app = express();
-const upload = multer({ storage: multer.memoryStorage() });
+
+// Improved Multer Configuration for Large Files
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 1024 * 1024 * 1024 // 1GB limit
+  }
+});
 
 // MongoDB Configuration with SSL fix
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -336,9 +343,13 @@ app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
       });
     }
 
-    const drive = google.drive({ version: 'v3', auth: oAuth2Client });
+    const drive = google.drive({ 
+      version: 'v3', 
+      auth: oAuth2Client,
+      timeout: 700000 // 5 minute timeout
+    });
 
-    // Upload to Drive
+    // Create resumable upload session
     const driveResponse = await drive.files.create({
       requestBody: {
         name: req.file.originalname,
@@ -349,6 +360,11 @@ app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
         mimeType: req.file.mimetype,
         body: require('stream').Readable.from(req.file.buffer),
       },
+      resumable: true // Enable resumable uploads
+    }, {
+      // Custom timeout and retry configuration
+      timeout: 700000,
+      maxRetries: 3
     });
 
     const fileId = driveResponse.data.id;
