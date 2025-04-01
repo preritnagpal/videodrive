@@ -29,60 +29,27 @@ for (const envVar of requiredEnvVars) {
   }
 }
 
-app.get('/get-video/:number', (req, res) => {
+
+ app.get('/get-video/:number', (req, res) => {
   const videoNumber = req.params.number;
-  console.log(`Requested Video: ${videoNumber}`);
+  console.log(Requested Video Number: ${videoNumber}); // Debug
 
   const videosFilePath = path.join(__dirname, 'public', 'videos.json');
 
-  // Case 1: Check if it's a direct Google Drive ID (28+ chars)
-  if (/^[a-zA-Z0-9_-]{28,}$/.test(videoNumber)) {
-    console.log('Treating as direct Drive ID');
-    return res.json({ 
-      success: true, 
-      videoId: videoNumber,
-      isDirectLink: true 
-    });
-  }
-
-  // Case 2: Check videos.json
+  // Check if videos.json exists
   if (fs.existsSync(videosFilePath)) {
-    try {
-      const videos = JSON.parse(fs.readFileSync(videosFilePath, 'utf8'));
-      
-      // Check if number exists
-      if (videos[videoNumber]) {
-        console.log(`Found in videos.json: ${videos[videoNumber].driveId}`);
-        return res.json({ 
-          success: true, 
-          videoId: videos[videoNumber].driveId 
-        });
-      }
+    const videos = JSON.parse(fs.readFileSync(videosFilePath, 'utf8'));
+    const video = videos[videoNumber];
 
-      // Check if any video has matching driveId (backward compatibility)
-      for (const [number, data] of Object.entries(videos)) {
-        if (data.driveId === videoNumber) {
-          console.log(`Found matching driveId: ${number}`);
-          return res.json({ 
-            success: true, 
-            videoId: data.driveId 
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error reading videos.json:', error);
+    // If video exists, return videoId
+    if (video) {
+      console.log(Found Video: ${video.driveId}); // Debug
+      return res.json({ success: true, videoId: video.driveId });
     }
   }
 
-  // Case 3: Check legacy storage (if you have one)
-  // You could add additional checks here for older storage formats
-
-  console.log('Video not found through any method');
-  res.status(404).json({ 
-    success: false, 
-    error: 'Video not found',
-    attemptedMethods: ['direct_id', 'videos_json', 'drive_id_match']
-  });
+  // If video not found
+  res.status(404).json({ success: false, error: 'Video not found' });
 });
 
 // Middleware Setup
@@ -371,38 +338,6 @@ app.get('/admin/videos', requireAuth, (req, res) => {
       error: 'Error loading video list',
       videos: []
     });
-  }
-});
-app.post('/migrate-legacy-videos', requireAuth, async (req, res) => {
-  try {
-    const legacyVideos = req.body; // Array of { oldId, driveId, name }
-    const videosFilePath = path.join(__dirname, 'public', 'videos.json');
-    
-    let videos = {};
-    if (fs.existsSync(videosFilePath)) {
-      videos = JSON.parse(fs.readFileSync(videosFilePath, 'utf8'));
-    }
-
-    // Generate new numbers for old videos
-    legacyVideos.forEach(video => {
-      let randomNumber;
-      do {
-        randomNumber = generateRandomNumber();
-      } while (videos[randomNumber]);
-      
-      videos[randomNumber] = {
-        driveId: video.driveId,
-        name: video.name || `Legacy Video ${randomNumber}`
-      };
-    });
-
-    fs.writeFileSync(videosFilePath, JSON.stringify(videos, null, 2));
-    broadcastVideosUpdate();
-    
-    res.json({ success: true, migrated: legacyVideos.length });
-  } catch (error) {
-    console.error('Migration error:', error);
-    res.status(500).json({ success: false, error: error.message });
   }
 });
 
