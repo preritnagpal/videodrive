@@ -7,9 +7,38 @@ const session = require('express-session');
 const multer = require('multer');
 const fs = require('fs');
 const WebSocket = require('ws');
+const { MongoClient } = require('mongodb');
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
+
+// MongoDB Configuration
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
+const DB_NAME = 'videoDB';
+let dbClient;
+
+// Initialize MongoDB connection
+async function initMongoDB() {
+  try {
+    if (MONGODB_URI && !MONGODB_URI.includes('localhost')) {
+      const client = new MongoClient(MONGODB_URI, {
+        connectTimeoutMS: 5000,
+        serverSelectionTimeoutMS: 5000,
+        retryWrites: true,
+        retryReads: true
+      });
+      await client.connect();
+      dbClient = client.db(DB_NAME);
+      console.log('✅ MongoDB Connected');
+      
+      // Create indexes
+      await dbClient.collection('videos').createIndex({ number: 1 }, { unique: true });
+      await dbClient.collection('videos').createIndex({ driveId: 1 });
+    }
+  } catch (err) {
+    console.error('❌ MongoDB Connection Error:', err);
+  }
+}
 
 // Verify required environment variables
 const requiredEnvVars = [
@@ -29,26 +58,74 @@ for (const envVar of requiredEnvVars) {
   }
 }
 
-app.get('/get-video/:number', (req, res) => {
-  const videoNumber = req.params.number;
-  console.log(`Requested Video Number: ${videoNumber}`); // Debug
+// Dual Storage Video Lookup
+async function getVideo(identifier) {
+  // Check if it's a direct Drive ID
+  if (/^[a-zA-Z0-9_-]{28,}$/.test(identifier)) {
+    return { driveId: identifier, isDirect: true };
+  }
 
-  const videosFilePath = path.join(__dirname, 'public', 'videos.json');
-
-  // Check if videos.json exists
-  if (fs.existsSync(videosFilePath)) {
-    const videos = JSON.parse(fs.readFileSync(videosFilePath, 'utf8'));
-    const video = videos[videoNumber];
-
-    // If video exists, return videoId
-    if (video) {
-      console.log(`Found Video: ${video.driveId}`); // Debug
-      return res.json({ success: true, videoId: video.driveId });
+  // Try MongoDB first if available
+  if (dbClient) {
+    try {
+      const video = await dbClient.collection('videos').findOne({
+        $or: [
+          { number: identifier },
+          { driveId: identifier }
+        ]
+      });
+      if (video) return video;
+    } catch (err) {
+      console.error('MongoDB lookup error:', err);
     }
   }
 
-  // If video not found
-  res.status(404).json({ success: false, error: 'Video not found' });
+  // Fall back to JSON file
+  const videosFilePath = path.join(__dirname, 'public', 'videos.json');
+  if (fs.existsSync(videosFilePath)) {
+    try {
+      const videos = JSON.parse(fs.readFileSync(videosFilePath, 'utf8'));
+      
+      // Check by number
+      if (videos[identifier]) {
+        return { 
+          driveId: videos[identifier].driveId,
+          name: videos[identifier].name 
+        };
+      }
+      
+      // Check by driveId
+      for (const [number, data] of Object.entries(videos)) {
+        if (data.driveId === identifier) {
+          return { driveId: data.driveId, name: data.name };
+        }
+      }
+    } catch (err) {
+      console.error('JSON file read error:', err);
+    }
+  }
+
+  return null;
+}
+
+// Update get-video endpoint to use dual storage
+app.get('/get-video/:identifier', async (req, res) => {
+  try {
+    const video = await getVideo(req.params.identifier);
+    
+    if (video) {
+      return res.json({ 
+        success: true, 
+        videoId: video.driveId,
+        isDirect: video.isDirect || false
+      });
+    }
+    
+    res.status(404).json({ success: false, error: 'Video not found' });
+  } catch (err) {
+    console.error('Video lookup error:', err);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
 });
 
 // Middleware Setup
@@ -92,7 +169,6 @@ app.use(async (req, res, next) => {
     try {
       oAuth2Client.setCredentials(req.session.tokens);
       
-      // Refresh token if expiring soon (within 5 minutes)
       if (oAuth2Client.isTokenExpiring()) {
         const { credentials } = await oAuth2Client.refreshAccessToken();
         req.session.tokens = credentials;
@@ -109,7 +185,8 @@ app.use(async (req, res, next) => {
 });
 
 // WebSocket Setup
-const server = app.listen(process.env.PORT || 3000, () => {
+const server = app.listen(process.env.PORT || 3000, async () => {
+  await initMongoDB();
   console.log(`🚀 Server running on http://localhost:${process.env.PORT || 3000}`);
 });
 
@@ -121,19 +198,41 @@ server.on('upgrade', (request, socket, head) => {
   });
 });
 
-function broadcastVideosUpdate() {
-  const videosFilePath = path.join(__dirname, 'public', 'videos.json');
-  if (!fs.existsSync(videosFilePath)) return;
-
+// Enhanced broadcast function for dual storage
+async function broadcastVideosUpdate() {
   try {
-    const videos = JSON.parse(fs.readFileSync(videosFilePath, 'utf8'));
-    const videoList = Object.entries(videos).map(([number, data]) => ({
-      number,
-      id: data.driveId,
-      name: data.name,
-      link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${number}`
-    }));
-
+    let videoList = [];
+    
+    // Get from MongoDB if available
+    if (dbClient) {
+      try {
+        const mongoVideos = await dbClient.collection('videos').find().toArray();
+        videoList = mongoVideos.map(video => ({
+          number: video.number,
+          id: video.driveId,
+          name: video.name,
+          link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${video.number}`
+        }));
+      } catch (err) {
+        console.error('MongoDB broadcast error:', err);
+      }
+    }
+    
+    // Fall back to JSON if MongoDB not available or empty
+    if (videoList.length === 0) {
+      const videosFilePath = path.join(__dirname, 'public', 'videos.json');
+      if (fs.existsSync(videosFilePath)) {
+        const videos = JSON.parse(fs.readFileSync(videosFilePath, 'utf8'));
+        videoList = Object.entries(videos).map(([number, data]) => ({
+          number,
+          id: data.driveId,
+          name: data.name,
+          link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${number}`
+        }));
+      }
+    }
+    
+    // Broadcast to all clients
     wss.clients.forEach(client => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(JSON.stringify({
@@ -143,16 +242,15 @@ function broadcastVideosUpdate() {
       }
     });
   } catch (error) {
-    console.error('Error broadcasting video update:', error);
+    console.error('Broadcast error:', error);
   }
 }
 
-// Routes
+// Routes (remain unchanged except where noted)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Admin Login
 app.get('/login', (req, res) => {
   if (req.session.authenticated) {
     return res.redirect('/admin');
@@ -175,7 +273,6 @@ app.get('/logout', (req, res) => {
   res.redirect('/');
 });
 
-// Google OAuth Routes
 app.get('/auth/google', requireAuth, (req, res) => {
   const authUrl = oAuth2Client.generateAuthUrl({
     access_type: 'offline',
@@ -206,16 +303,16 @@ app.get('/auth/status', requireAuth, (req, res) => {
     connected: !!req.session.tokens,
     clientIdConfigured: !!process.env.GOOGLE_CLIENT_ID,
     redirectUri: process.env.GOOGLE_REDIRECT_URI,
+    mongoConnected: !!dbClient
   });
 });
 
-// File Upload with Enhanced Error Handling
 // Helper function to generate random number
 function generateRandomNumber(min = 1000, max = 9999) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-// File Upload with Enhanced Error Handling
+// Enhanced upload handler with dual storage
 app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
   try {
     if (!req.session.tokens) {
@@ -259,25 +356,36 @@ app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
       },
     });
 
-    // Update videos.json
+    // Generate a unique random number
+    const randomNumber = generateRandomNumber();
+    
+    // Store in both MongoDB and JSON
+    const videoData = {
+      number: randomNumber,
+      driveId: fileId,
+      name: req.file.originalname,
+      createdAt: new Date()
+    };
+
+    // Save to MongoDB
+    if (dbClient) {
+      try {
+        await dbClient.collection('videos').insertOne(videoData);
+      } catch (err) {
+        console.error('MongoDB insert error:', err);
+      }
+    }
+
+    // Save to JSON
     const videosFilePath = path.join(__dirname, 'public', 'videos.json');
     let videos = {};
-    
     if (fs.existsSync(videosFilePath)) {
       videos = JSON.parse(fs.readFileSync(videosFilePath, 'utf8'));
     }
-
-    // Generate a unique random number
-    let randomNumber;
-    do {
-      randomNumber = generateRandomNumber();
-    } while (videos[randomNumber]); // Ensure the number is unique
-
     videos[randomNumber] = {
       driveId: fileId,
       name: req.file.originalname
     };
-
     fs.writeFileSync(videosFilePath, JSON.stringify(videos, null, 2));
 
     // Broadcast update
@@ -288,7 +396,8 @@ app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
       link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${randomNumber}`,
       id: fileId,
       number: randomNumber,
-      name: req.file.originalname
+      name: req.file.originalname,
+      storedIn: dbClient ? ['mongodb', 'json'] : ['json']
     });
 
   } catch (error) {
@@ -305,31 +414,48 @@ app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
   }
 });
 
-// Video Management
-app.get('/admin/videos', requireAuth, (req, res) => {
-  const videosFilePath = path.join(__dirname, 'public', 'videos.json');
-
+// Enhanced video listing with dual storage
+app.get('/admin/videos', requireAuth, async (req, res) => {
   try {
-    let videos = {};
+    let videoList = [];
     
-    if (fs.existsSync(videosFilePath)) {
-      const fileContent = fs.readFileSync(videosFilePath, 'utf8');
-      videos = fileContent ? JSON.parse(fileContent) : {};
+    // Try MongoDB first
+    if (dbClient) {
+      try {
+        const mongoVideos = await dbClient.collection('videos').find().sort({ createdAt: -1 }).toArray();
+        videoList = mongoVideos.map(video => ({
+          number: video.number,
+          id: video.driveId,
+          name: video.name,
+          link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${video.number}`,
+          driveLink: `https://drive.google.com/file/d/${video.driveId}/view`,
+          source: 'mongodb'
+        }));
+      } catch (err) {
+        console.error('MongoDB query error:', err);
+      }
     }
-
-    const videoList = Object.entries(videos).map(([number, data]) => ({
-      number,
-      id: data.driveId,
-      name: data.name,
-      link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${number}`,
-      driveLink: `https://drive.google.com/file/d/${data.driveId}/view`
-    }));
-
+    
+    // Fall back to JSON if needed
+    if (videoList.length === 0) {
+      const videosFilePath = path.join(__dirname, 'public', 'videos.json');
+      if (fs.existsSync(videosFilePath)) {
+        const videos = JSON.parse(fs.readFileSync(videosFilePath, 'utf8'));
+        videoList = Object.entries(videos).map(([number, data]) => ({
+          number,
+          id: data.driveId,
+          name: data.name,
+          link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${number}`,
+          driveLink: `https://drive.google.com/file/d/${data.driveId}/view`,
+          source: 'json'
+        }));
+      }
+    }
+    
     res.json({ 
       success: true, 
       videos: videoList 
     });
-
   } catch (error) {
     console.error('Error loading videos:', error);
     res.status(500).json({ 
@@ -340,10 +466,9 @@ app.get('/admin/videos', requireAuth, (req, res) => {
   }
 });
 
-// Delete Video with Enhanced Error Handling
+// Enhanced delete with dual storage
 app.delete('/delete-video/:videoId', requireAuth, async (req, res) => {
   const videoId = req.params.videoId;
-  const videosFilePath = path.join(__dirname, 'public', 'videos.json');
 
   try {
     if (!req.session.tokens) {
@@ -354,22 +479,50 @@ app.delete('/delete-video/:videoId', requireAuth, async (req, res) => {
       });
     }
 
-    if (!fs.existsSync(videosFilePath)) {
-      return res.status(404).json({ success: false, error: "No videos found" });
-    }
-
-    const videos = JSON.parse(fs.readFileSync(videosFilePath, 'utf8'));
-    const videoNumber = Object.keys(videos).find(key => videos[key].driveId === videoId);
-
-    if (!videoNumber) {
-      return res.status(404).json({ success: false, error: "Video not found" });
-    }
-
+    // Delete from Google Drive
     const drive = google.drive({ version: 'v3', auth: oAuth2Client });
     await drive.files.delete({ fileId: videoId });
 
-    delete videos[videoNumber];
-    fs.writeFileSync(videosFilePath, JSON.stringify(videos, null, 2));
+    // Delete from MongoDB
+    let deletedNumber = null;
+    if (dbClient) {
+      try {
+        const result = await dbClient.collection('videos').findOneAndDelete({ 
+          $or: [
+            { number: videoId },
+            { driveId: videoId }
+          ]
+        });
+        if (result.value) deletedNumber = result.value.number;
+      } catch (err) {
+        console.error('MongoDB delete error:', err);
+      }
+    }
+
+    // Delete from JSON
+    const videosFilePath = path.join(__dirname, 'public', 'videos.json');
+    if (fs.existsSync(videosFilePath)) {
+      try {
+        const videos = JSON.parse(fs.readFileSync(videosFilePath, 'utf8'));
+        
+        // If we don't know the number from MongoDB, find it
+        if (!deletedNumber) {
+          for (const [number, data] of Object.entries(videos)) {
+            if (data.driveId === videoId) {
+              deletedNumber = number;
+              break;
+            }
+          }
+        }
+        
+        if (deletedNumber && videos[deletedNumber]) {
+          delete videos[deletedNumber];
+          fs.writeFileSync(videosFilePath, JSON.stringify(videos, null, 2));
+        }
+      } catch (err) {
+        console.error('JSON delete error:', err);
+      }
+    }
 
     // Broadcast update
     broadcastVideosUpdate();
@@ -394,8 +547,72 @@ app.get('/admin', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
+// Migration endpoint for old videos
+app.post('/migrate-legacy', requireAuth, async (req, res) => {
+  if (!dbClient) {
+    return res.status(400).json({ success: false, error: 'MongoDB not connected' });
+  }
+
+  try {
+    const legacyVideos = req.body.videos || [];
+    const results = await dbClient.collection('videos').bulkWrite(
+      legacyVideos.map(video => ({
+        updateOne: {
+          filter: { number: video.number },
+          update: {
+            $set: {
+              driveId: video.driveId,
+              name: video.name || `Legacy Video ${video.number}`,
+              updatedAt: new Date()
+            },
+            $setOnInsert: {
+              createdAt: new Date()
+            }
+          },
+          upsert: true
+        }
+      })),
+      { ordered: false }
+    );
+
+    // Also update JSON file
+    const videosFilePath = path.join(__dirname, 'public', 'videos.json');
+    let videos = {};
+    if (fs.existsSync(videosFilePath)) {
+      videos = JSON.parse(fs.readFileSync(videosFilePath, 'utf8'));
+    }
+    legacyVideos.forEach(video => {
+      videos[video.number] = { driveId: video.driveId, name: video.name };
+    });
+    fs.writeFileSync(videosFilePath, JSON.stringify(videos, null, 2));
+
+    broadcastVideosUpdate();
+
+    res.json({ 
+      success: true,
+      inserted: results.upsertedCount,
+      modified: results.modifiedCount
+    });
+  } catch (error) {
+    console.error('Migration error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Error Handling Middleware
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
   res.status(500).json({ success: false, error: 'Internal server error' });
+});
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  if (dbClient) {
+    await dbClient.client.close();
+    console.log('MongoDB connection closed');
+  }
+  server.close(() => {
+    console.log('Server stopped');
+    process.exit(0);
+  });
 });
