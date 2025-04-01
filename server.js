@@ -13,37 +13,43 @@ const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
 // MongoDB Configuration with SSL fix
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
+const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = 'videoDB';
 let dbClient;
 
-// Initialize MongoDB connection with proper SSL handling
 async function initMongoDB() {
   try {
-    if (MONGODB_URI && !MONGODB_URI.includes('localhost')) {
+    if (MONGODB_URI) {
       const client = new MongoClient(MONGODB_URI, {
-        connectTimeoutMS: 5000,
-        serverSelectionTimeoutMS: 5000,
+        serverApi: {
+          version: ServerApiVersion.v1,
+          strict: true,
+          deprecationErrors: true,
+        },
+        connectTimeoutMS: 10000,
+        serverSelectionTimeoutMS: 10000,
         retryWrites: true,
-        retryReads: true,
-        serverApi: ServerApiVersion.v1,
-        tls: true,
-        tlsAllowInvalidCertificates: false
+        retryReads: true
       });
-      
+
       await client.connect();
       dbClient = client.db(DB_NAME);
-      console.log('✅ MongoDB Connected');
+      
+      // Verify connection
+      await client.db("admin").command({ ping: 1 });
+      console.log("✅ MongoDB Connected");
       
       // Create indexes
       await dbClient.collection('videos').createIndex({ number: 1 }, { unique: true });
       await dbClient.collection('videos').createIndex({ driveId: 1 });
+    } else {
+      console.log('⚠️ MongoDB URI not configured - using JSON fallback');
     }
   } catch (err) {
     console.error('❌ MongoDB Connection Error:', err);
-    // Implement retry logic if needed
     setTimeout(initMongoDB, 5000);
   }
+}
 }
 
 // Dual Storage Video Lookup
