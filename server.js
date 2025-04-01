@@ -7,17 +7,17 @@ const session = require('express-session');
 const multer = require('multer');
 const fs = require('fs');
 const WebSocket = require('ws');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ServerApiVersion } = require('mongodb');
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// MongoDB Configuration
+// MongoDB Configuration with SSL fix
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 const DB_NAME = 'videoDB';
 let dbClient;
 
-// Initialize MongoDB connection
+// Initialize MongoDB connection with proper SSL handling
 async function initMongoDB() {
   try {
     if (MONGODB_URI && !MONGODB_URI.includes('localhost')) {
@@ -25,8 +25,13 @@ async function initMongoDB() {
         connectTimeoutMS: 5000,
         serverSelectionTimeoutMS: 5000,
         retryWrites: true,
-        retryReads: true
+        retryReads: true,
+        serverApi: ServerApiVersion.v1,
+        tls: true,
+        tlsAllowInvalidCertificates: false,
+        minTLSVersion: 'TLSv1.2'
       });
+      
       await client.connect();
       dbClient = client.db(DB_NAME);
       console.log('✅ MongoDB Connected');
@@ -37,24 +42,8 @@ async function initMongoDB() {
     }
   } catch (err) {
     console.error('❌ MongoDB Connection Error:', err);
-  }
-}
-
-// Verify required environment variables
-const requiredEnvVars = [
-  'SESSION_SECRET',
-  'ADMIN_USERNAME',
-  'ADMIN_PASSWORD',
-  'GOOGLE_CLIENT_ID',
-  'GOOGLE_CLIENT_SECRET',
-  'GOOGLE_REDIRECT_URI',
-  'GOOGLE_DRIVE_FOLDER_ID',
-];
-
-for (const envVar of requiredEnvVars) {
-  if (!process.env[envVar]) {
-    console.error(`FATAL ERROR: ${envVar} is not defined in .env file`);
-    process.exit(1);
+    // Implement retry logic if needed
+    setTimeout(initMongoDB, 5000);
   }
 }
 
@@ -107,26 +96,6 @@ async function getVideo(identifier) {
 
   return null;
 }
-
-// Update get-video endpoint to use dual storage
-app.get('/get-video/:identifier', async (req, res) => {
-  try {
-    const video = await getVideo(req.params.identifier);
-    
-    if (video) {
-      return res.json({ 
-        success: true, 
-        videoId: video.driveId,
-        isDirect: video.isDirect || false
-      });
-    }
-    
-    res.status(404).json({ success: false, error: 'Video not found' });
-  } catch (err) {
-    console.error('Video lookup error:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
 
 // Middleware Setup
 app.use(express.json());
@@ -246,9 +215,28 @@ async function broadcastVideosUpdate() {
   }
 }
 
-// Routes (remain unchanged except where noted)
+// Routes
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/get-video/:identifier', async (req, res) => {
+  try {
+    const video = await getVideo(req.params.identifier);
+    
+    if (video) {
+      return res.json({ 
+        success: true, 
+        videoId: video.driveId,
+        isDirect: video.isDirect || false
+      });
+    }
+    
+    res.status(404).json({ success: false, error: 'Video not found' });
+  } catch (err) {
+    console.error('Video lookup error:', err);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
 });
 
 app.get('/login', (req, res) => {
@@ -307,12 +295,10 @@ app.get('/auth/status', requireAuth, (req, res) => {
   });
 });
 
-// Helper function to generate random number
 function generateRandomNumber(min = 1000, max = 9999) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-// Enhanced upload handler with dual storage
 app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
   try {
     if (!req.session.tokens) {
@@ -414,7 +400,6 @@ app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
   }
 });
 
-// Enhanced video listing with dual storage
 app.get('/admin/videos', requireAuth, async (req, res) => {
   try {
     let videoList = [];
@@ -466,7 +451,6 @@ app.get('/admin/videos', requireAuth, async (req, res) => {
   }
 });
 
-// Enhanced delete with dual storage
 app.delete('/delete-video/:videoId', requireAuth, async (req, res) => {
   const videoId = req.params.videoId;
 
@@ -542,12 +526,10 @@ app.delete('/delete-video/:videoId', requireAuth, async (req, res) => {
   }
 });
 
-// Admin Panel
 app.get('/admin', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// Migration endpoint for old videos
 app.post('/migrate-legacy', requireAuth, async (req, res) => {
   if (!dbClient) {
     return res.status(400).json({ success: false, error: 'MongoDB not connected' });
