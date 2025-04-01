@@ -51,7 +51,23 @@ async function initMongoDB() {
   }
 }
 }
-
+app.get('/test-db', async (req, res) => {
+  try {
+    if (!dbClient) await initMongoDB();
+    const stats = await dbClient.stats();
+    res.json({
+      status: 'success',
+      db: stats.db,
+      collections: stats.collections
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'error',
+      error: err.message,
+      connectionString: process.env.MONGODB_URI ? 'configured' : 'missing'
+    });
+  }
+});
 // Dual Storage Video Lookup
 async function getVideo(identifier) {
   // Check if it's a direct Drive ID
