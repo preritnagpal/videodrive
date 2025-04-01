@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Modified ad click detection for TrafficStars
   let adClicked = false;
   
-  // Method 1: Detect clicks on the ad container
   document.querySelector('.ts-ad-container').addEventListener('click', () => {
     if (!adClicked) {
       console.log('✅ Ad clicked (container click)');
@@ -24,7 +23,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   
-  // Method 2: Detect when user returns from ad (back button)
   window.addEventListener('blur', () => {
     setTimeout(() => {
       if (document.hidden && !adClicked) {
@@ -35,27 +33,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 500);
   });
 
-  // Handle "I have clicked the ad" button click
   adClickBtn.addEventListener('click', () => {
     console.log('✅ Ad verified');
     adGate.style.display = 'none';
     ageGate.style.display = 'flex';
   });
 
-  // Handle "Yes, I'm 18+" button click
   verifyBtn.addEventListener('click', () => {
     console.log('✅ Age Verified');
     ageGate.style.display = 'none';
     loadVideo();
   });
 
-  // Handle "No, I'm under 18" button click
   denyBtn.addEventListener('click', () => {
     alert('❌ Access denied. You must be 18+ to view this content.');
     window.location.href = 'https://www.google.com';
   });
 
-  // Load video after verification
+  // Updated loadVideo function with backward compatibility
   async function loadVideo() {
     const urlParams = new URLSearchParams(window.location.search);
     const videoNumber = urlParams.get('video');
@@ -67,28 +62,43 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      // Fetch video metadata
+      // First try the new API endpoint
       const response = await fetch(`/get-video/${videoNumber}`);
-      if (!response.ok) throw new Error('❌ Could not fetch video info');
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          return displayVideo(result.videoId);
+        }
+      }
 
-      const result = await response.json();
-      if (!result.success) throw new Error(result.error || '❌ Video not found');
+      // If new endpoint fails, try old format (direct Google Drive ID)
+      if (/^[a-zA-Z0-9_-]{28,}$/.test(videoNumber)) {
+        return displayVideo(videoNumber);
+      }
 
-      // Display the Google Drive video
-      container.innerHTML = `
-        <iframe class="video-player"
-          src="https://drive.google.com/file/d/${result.videoId}/preview?vq=hd1080"
-          frameborder="0"
-          allow="autoplay; encrypted-media"
-          allowfullscreen>
-        </iframe>
-      `;
+      throw new Error('Video not found');
+
     } catch (error) {
       container.innerHTML = `
         <div class="error">
           <p>❌ Error loading video. The video may be removed or unavailable.</p>
+          <p>${error.message}</p>
         </div>
       `;
+      console.error('Video load error:', error);
     }
+  }
+
+  // Helper function to display video
+  function displayVideo(videoId) {
+    videoContainer.innerHTML = `
+      <iframe class="video-player"
+        src="https://drive.google.com/file/d/${videoId}/preview?vq=hd1080"
+        frameborder="0"
+        allow="autoplay; encrypted-media"
+        allowfullscreen>
+      </iframe>
+    `;
   }
 });
