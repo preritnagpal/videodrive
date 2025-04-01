@@ -29,10 +29,9 @@ for (const envVar of requiredEnvVars) {
   }
 }
 
-
- app.get('/get-video/:number', (req, res) => {
+app.get('/get-video/:number', (req, res) => {
   const videoNumber = req.params.number;
-  console.log(Requested Video Number: ${videoNumber}); // Debug
+  console.log(`Requested Video Number: ${videoNumber}`); // Debug
 
   const videosFilePath = path.join(__dirname, 'public', 'videos.json');
 
@@ -43,7 +42,7 @@ for (const envVar of requiredEnvVars) {
 
     // If video exists, return videoId
     if (video) {
-      console.log(Found Video: ${video.driveId}); // Debug
+      console.log(`Found Video: ${video.driveId}`); // Debug
       return res.json({ success: true, videoId: video.driveId });
     }
   }
@@ -132,7 +131,7 @@ function broadcastVideosUpdate() {
       number,
       id: data.driveId,
       name: data.name,
-      link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${number}`
+      link: `${process.env.BASE_URL || 'http://localhost:3000'}/?video=${number}`
     }));
 
     wss.clients.forEach(client => {
@@ -286,7 +285,7 @@ app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
 
     res.json({
       success: true,
-      link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${randomNumber}`,
+      link: `${process.env.BASE_URL || 'http://localhost:3000'}/?video=${randomNumber}`,
       id: fileId,
       number: randomNumber,
       name: req.file.originalname
@@ -322,7 +321,7 @@ app.get('/admin/videos', requireAuth, (req, res) => {
       number,
       id: data.driveId,
       name: data.name,
-      link: `${process.env.BASE_URL || 'https://sexydrive.koyeb.app'}/?video=${number}`,
+      link: `${process.env.BASE_URL || 'http://localhost:3000'}/?video=${number}`,
       driveLink: `https://drive.google.com/file/d/${data.driveId}/view`
     }));
 
